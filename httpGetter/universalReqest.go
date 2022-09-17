@@ -19,7 +19,7 @@ type UniversalRequest struct {
 	Method     Method
 	URI        string
 	RespStatus int
-	Body       map[string]interface{}
+	Body       interface{}
 	Headers    []map[string]string
 	Params     []map[string]string
 }
@@ -66,6 +66,14 @@ func (ur UniversalRequest) UniversalRequest(resultStruct interface{}) (string, e
 		if err != nil {
 			return reqDetail, err
 		}
+	case MethodGet:
+		resp, err = req.Get(ur.URI)
+		reqDetail = fmt.Sprintf("%+v", *req)
+		if err != nil {
+			return reqDetail, err
+		}
+	default:
+		return reqDetail, fmt.Errorf("указан некорректный метод %v", ur.Method)
 	}
 
 	err = ur.checkStatus(resp)

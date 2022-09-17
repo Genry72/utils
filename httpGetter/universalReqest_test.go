@@ -1,6 +1,7 @@
 package httpGetter
 
 import (
+	"fmt"
 	"github.com/go-resty/resty/v2"
 	"strings"
 	"testing"
@@ -29,7 +30,7 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 		Method
 		URI        string
 		RespStatus int
-		Body       map[string]interface{}
+		Body       interface{}
 		Headers    []map[string]string
 		Params     []map[string]string
 	}
@@ -40,15 +41,17 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 
 	// Параметры запроса
 	params := []map[string]string{{"param1": "1"}, {"param2": "2"}}
-
+	headers := []map[string]string{{"Myhead1": "1"}, {"Myhead2": "2"}}
+	bodMap := map[string]interface{}{"bodvalue": 1}
 	tests := []struct {
 		name          string
 		args          args
 		fields        fields
 		wantReqDetail string
-		bodyContain   string // Проверка существования в ответе текста
+		respContain   string // Проверка существования в ответе текста
 		wantErr       bool
 	}{
+		//Post
 		{
 			name: "Без структуры",
 			args: args{
@@ -59,12 +62,12 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 				Method:     MethodPost,
 				URI:        "https://httpbin.org/post",
 				RespStatus: 200,
-				Body:       nil,
-				Headers:    nil,
+				Body:       "bodvalue",
+				Headers:    headers,
 				Params:     params,
 			},
-			wantReqDetail: "Method:POST", // ищем слово в информации о запросе
-			bodyContain:   "args",
+			wantReqDetail: "Method:", // ищем слово в информации о запросе
+			respContain:   "args",
 			wantErr:       false,
 		},
 		{
@@ -77,12 +80,31 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 				Method:     MethodPost,
 				URI:        "https://httpbin.org/post",
 				RespStatus: 200,
-				Body:       nil,
-				Headers:    nil,
+				Body:       bodMap,
+				Headers:    headers,
 				Params:     params,
 			},
-			wantReqDetail: "Method:POST", // ищем слово в информации о запросе
-			bodyContain:   "args",
+			wantReqDetail: "Method:", // ищем слово в информации о запросе
+			respContain:   "args",
+			wantErr:       false,
+		},
+		//Get
+		{
+			name: "Get Со структурой",
+			args: args{
+				resultStruct: HttpbinStruct{},
+			},
+			fields: fields{
+				Client:     resty.New(),
+				Method:     MethodGet,
+				URI:        "https://httpbin.org/get",
+				RespStatus: 200,
+				Body:       nil,
+				Headers:    headers,
+				Params:     params,
+			},
+			wantReqDetail: "Method:", // ищем слово в информации о запросе
+			respContain:   "args",
 			wantErr:       false,
 		},
 	}
@@ -97,32 +119,44 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 				Headers:    tt.fields.Headers,
 				Params:     tt.fields.Params,
 			}
-			var reqDetail string
-			var err error
+			result := fmt.Sprintf("%+v", tt.args.resultStruct)
+			reqDetail, err := ur.UniversalRequest(&result)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Вернулась ошибка = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
 			switch tt.args.resultStruct.(type) {
-			case string: // Передача троки
+			case string: // Передача cтроки
 				result := tt.args.resultStruct.(string)
 				reqDetail, err = ur.UniversalRequest(&result)
 
-				if !strings.Contains(result, tt.bodyContain) {
-					t.Errorf("Неожиданное тело ответа. Не нашли в боди %v. Боди:%v", tt.bodyContain, result)
+				if !strings.Contains(result, tt.respContain) {
+					t.Errorf("Неожиданное тело ответа. Не нашли в боди %v. Боди:%v", tt.respContain, result)
 				}
 
 			case HttpbinStruct: // Передача структуры
 				result := tt.args.resultStruct.(HttpbinStruct)
 				reqDetail, err = ur.UniversalRequest(&result)
 
-				if !strings.Contains(result.URL, "https://httpbin.org/post") {
+				if !strings.Contains(result.URL, "https://httpbin.org") {
 					t.Errorf("Не нашли в стуктуре URL https://httpbin.org/post. Полученная структура %+v", result)
 				}
 				if result.Args["param1"] != "1" {
 					t.Errorf("Не нашли параметр param1 в запросе\n %+v", result)
 				}
+
+				if result.Headers["Myhead1"] != "1" {
+					t.Errorf("Не нашли хедер Myhead1 в запросе\n %+v", result)
+				}
 			}
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Вернулась ошибка = %v, wantErr %v", err, tt.wantErr)
-				return
+			switch tt.fields.Method {
+			case MethodPost:
+				//Для метода post проверяем корректную отправку тела запроса
+				if !strings.Contains(result, "bodvalue") {
+					t.Errorf("Не нашли в теле запроса bodvalue\n %+v", result)
+				}
 			}
 
 			if !strings.Contains(reqDetail, tt.wantReqDetail) {
