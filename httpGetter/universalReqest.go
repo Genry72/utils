@@ -26,21 +26,25 @@ type UniversalRequest struct {
 
 // UniversalRequest выполняет любой запрос. Возвращает расперсенный ответ на основе переданной структуры.
 // Если вместо структуры передали string, то вернется тело ответа
-func (ur UniversalRequest) UniversalRequest(resultStruct interface{}) (string, error) {
+func (ur UniversalRequest) UniversalRequest(resultStruct interface{}) (req resty.Request, err error) {
 
 	if ur.URI == "" {
-		return "", fmt.Errorf("не задан URI")
+		return req, fmt.Errorf("не задан URI")
 	}
 
 	if ur.Method == "" {
-		return "", fmt.Errorf("не задан метод")
+		return req, fmt.Errorf("не задан метод")
+	}
+
+	if ur.RespStatus == 0 {
+		return req, fmt.Errorf("не задан код ожидаемого ответа")
 	}
 
 	if resultStruct == nil {
-		return "", fmt.Errorf("не передана структура. Передайте поинтер на переменную с пустой строкой, если не нужно парсить тело ответа")
+		return req, fmt.Errorf("не передана структура. Передайте поинтер на переменную с пустой строкой, если не нужно парсить тело ответа")
 	}
 
-	req := ur.Client.R()
+	req = *ur.Client.R()
 
 	// Добавляем тело запроса
 	if ur.Body != nil {
@@ -57,40 +61,36 @@ func (ur UniversalRequest) UniversalRequest(resultStruct interface{}) (string, e
 	}
 
 	var resp *resty.Response
-	var err error
-	var reqDetail string
 	switch ur.Method {
 	case MethodPost:
 		resp, err = req.Post(ur.URI)
-		reqDetail = fmt.Sprintf("%+v", *req)
 		if err != nil {
-			return reqDetail, err
+			return req, err
 		}
 	case MethodGet:
 		resp, err = req.Get(ur.URI)
-		reqDetail = fmt.Sprintf("%+v", *req)
 		if err != nil {
-			return reqDetail, err
+			return req, err
 		}
 	default:
-		return reqDetail, fmt.Errorf("указан некорректный метод %v", ur.Method)
+		return req, fmt.Errorf("указан некорректный метод %v", ur.Method)
 	}
 
 	err = ur.checkStatus(resp)
 	if err != nil {
-		return reqDetail, err
+		return req, err
 	}
 	switch resultStruct.(type) {
 	case *string: // Возвращаем тело ответа без парсинга
 		*resultStruct.(*string) = string(resp.Body())
-		return reqDetail, err
+		return req, err
 	default:
 		err = json.Unmarshal(resp.Body(), resultStruct)
 
 		if err != nil {
-			return reqDetail, fmt.Errorf("не удалось распарсить тело ответа: %w %s", err, string(resp.Body()))
+			return req, fmt.Errorf("не удалось распарсить тело ответа: %w %s", err, string(resp.Body()))
 		}
-		return reqDetail, nil
+		return req, nil
 	}
 }
 

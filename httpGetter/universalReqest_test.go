@@ -150,12 +150,47 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 				}
 			}
 
-			if !strings.Contains(reqDetail, tt.wantReqDetail) {
+			if !strings.Contains(fmt.Sprintf("%+v", reqDetail), tt.wantReqDetail) {
 				t.Errorf("В информации о заросе не нашли %v, вернулось %v", tt.wantReqDetail, reqDetail)
 			}
 
-			t.Logf(reqDetail)
+			t.Logf(fmt.Sprintf("%+v", reqDetail))
 
 		})
 	}
+}
+
+func ExampleUniversalRequest_UniversalRequest() {
+	type HttpbinStruct struct {
+		Args  map[string]string `json:"args"`
+		Data  string            `json:"data"`
+		Files struct {
+		} `json:"files"`
+		Form struct {
+			Bod1 string `json:"bod1"`
+		} `json:"form"`
+		Headers map[string]string `json:"headers"`
+
+		JSON   interface{} `json:"json"`
+		Origin string      `json:"origin"`
+		URL    string      `json:"url"`
+	}
+	ur := NewUniversalRequest(5, 0)
+	params := []map[string]string{{"param1": "1"}, {"param2": "2"}}
+	headers := []map[string]string{{"Myhead1": "1"}, {"Myhead2": "2"}}
+	bodMap := map[string]interface{}{"bodvalue": 1}
+	ur.Method = MethodPost
+	ur.URI = "https://httpbin.org/post"
+	ur.RespStatus = 200
+	ur.Body = bodMap
+	ur.Headers = headers
+	ur.Params = params
+	result := HttpbinStruct{}
+	_, err := ur.UniversalRequest(&result)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(result.URL)
+	// Output: https://httpbin.org/post?param1=1&param2=2
 }
