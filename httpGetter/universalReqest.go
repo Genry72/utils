@@ -102,7 +102,7 @@ func (ur UniversalRequest) checkStatus(resp *resty.Response) error {
 	return nil
 }
 
-func NewUniversalRequest(timeout time.Duration, retryCount int) *UniversalRequest {
+func NewUniversalRequest(timeout time.Duration, retryCount int) UniversalRequest {
 	client := resty.New()
 	// Добавляем дефолтный таймаут
 	if timeout != 0 {
@@ -110,11 +110,9 @@ func NewUniversalRequest(timeout time.Duration, retryCount int) *UniversalReques
 	}
 
 	//Количество повторов запроса, в случае неудачи
-	if retryCount != 0 {
-		client.SetRetryCount(retryCount)
-	}
+	client.SetRetryCount(retryCount)
 
-	return &UniversalRequest{
+	return UniversalRequest{
 		Client:     client,
 		URI:        "",
 		RespStatus: 0,
