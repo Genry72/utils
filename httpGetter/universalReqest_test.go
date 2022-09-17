@@ -154,7 +154,9 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 				t.Errorf("В информации о заросе не нашли %v, вернулось %v", tt.wantReqDetail, reqDetail)
 			}
 
-			t.Logf(fmt.Sprintf("%+v", reqDetail))
+			if !strings.Contains(fmt.Sprint(reqDetail.URL), "https://httpbin.org") {
+				t.Errorf("В информации о запросе не вернулся URL\n %+v", reqDetail)
+			}
 
 		})
 	}
