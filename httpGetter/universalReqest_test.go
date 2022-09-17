@@ -2,7 +2,6 @@ package httpGetter
 
 import (
 	"fmt"
-	"github.com/go-resty/resty/v2"
 	"strings"
 	"testing"
 )
@@ -26,18 +25,19 @@ type HttpbinStruct struct {
 func TestUniversalRequest_UniversalRequest(t *testing.T) {
 	t.Parallel()
 	type fields struct {
-		Client *resty.Client
 		Method
-		URI        string
-		RespStatus int
-		Body       interface{}
-		Headers    []map[string]string
-		Params     []map[string]string
+		URI     string
+		Body    interface{}
+		Headers []map[string]string
+		Params  []map[string]string
 	}
 
 	type args struct {
 		resultStruct interface{}
 	}
+
+	ur := NewUniversalRequest(5, 0)
+	ur.RespStatus = 200
 
 	// Параметры запроса
 	params := []map[string]string{{"param1": "1"}, {"param2": "2"}}
@@ -58,13 +58,11 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 				resultStruct: "",
 			},
 			fields: fields{
-				Client:     resty.New(),
-				Method:     MethodPost,
-				URI:        "https://httpbin.org/post",
-				RespStatus: 200,
-				Body:       "bodvalue",
-				Headers:    headers,
-				Params:     params,
+				Method:  MethodPost,
+				URI:     "https://httpbin.org/post",
+				Body:    "bodvalue",
+				Headers: headers,
+				Params:  params,
 			},
 			wantReqDetail: "Method:", // ищем слово в информации о запросе
 			respContain:   "args",
@@ -76,13 +74,11 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 				resultStruct: HttpbinStruct{},
 			},
 			fields: fields{
-				Client:     resty.New(),
-				Method:     MethodPost,
-				URI:        "https://httpbin.org/post",
-				RespStatus: 200,
-				Body:       bodMap,
-				Headers:    headers,
-				Params:     params,
+				Method:  MethodPost,
+				URI:     "https://httpbin.org/post",
+				Body:    bodMap,
+				Headers: headers,
+				Params:  params,
 			},
 			wantReqDetail: "Method:", // ищем слово в информации о запросе
 			respContain:   "args",
@@ -95,13 +91,11 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 				resultStruct: HttpbinStruct{},
 			},
 			fields: fields{
-				Client:     resty.New(),
-				Method:     MethodGet,
-				URI:        "https://httpbin.org/get",
-				RespStatus: 200,
-				Body:       nil,
-				Headers:    headers,
-				Params:     params,
+				Method:  MethodGet,
+				URI:     "https://httpbin.org/get",
+				Body:    nil,
+				Headers: headers,
+				Params:  params,
 			},
 			wantReqDetail: "Method:", // ищем слово в информации о запросе
 			respContain:   "args",
@@ -110,15 +104,12 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ur := UniversalRequest{
-				Client:     tt.fields.Client,
-				Method:     tt.fields.Method,
-				URI:        tt.fields.URI,
-				RespStatus: tt.fields.RespStatus,
-				Body:       tt.fields.Body,
-				Headers:    tt.fields.Headers,
-				Params:     tt.fields.Params,
-			}
+			ur.Method = tt.fields.Method
+			ur.URI = tt.fields.URI
+			ur.Body = tt.fields.Body
+			ur.Headers = tt.fields.Headers
+			ur.Params = tt.fields.Params
+
 			result := fmt.Sprintf("%+v", tt.args.resultStruct)
 			reqDetail, err := ur.UniversalRequest(&result)
 			if (err != nil) != tt.wantErr {
