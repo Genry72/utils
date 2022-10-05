@@ -2,6 +2,7 @@ package httpGetter
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -35,9 +36,10 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 	type args struct {
 		resultStruct interface{}
 	}
-
-	ur := NewUniversalRequest(5, 0)
-	ur.RespStatus = 200
+	ur := UniversalRequest{
+		Client:     NewUsClient(5, 0),
+		RespStatus: 200,
+	}
 
 	// Параметры запроса
 	params := []map[string]string{{"param1": "1"}, {"param2": "2"}}
@@ -58,7 +60,7 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 				resultStruct: "",
 			},
 			fields: fields{
-				Method:  MethodPost,
+				Method:  http.MethodPost,
 				URI:     "https://httpbin.org/post",
 				Body:    "bodvalue",
 				Headers: headers,
@@ -74,7 +76,7 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 				resultStruct: HttpbinStruct{},
 			},
 			fields: fields{
-				Method:  MethodPost,
+				Method:  http.MethodPost,
 				URI:     "https://httpbin.org/post",
 				Body:    bodMap,
 				Headers: headers,
@@ -91,7 +93,7 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 				resultStruct: HttpbinStruct{},
 			},
 			fields: fields{
-				Method:  MethodGet,
+				Method:  http.MethodGet,
 				URI:     "https://httpbin.org/get",
 				Body:    nil,
 				Headers: headers,
@@ -143,7 +145,7 @@ func TestUniversalRequest_UniversalRequest(t *testing.T) {
 			}
 
 			switch tt.fields.Method {
-			case MethodPost:
+			case http.MethodPost:
 				//Для метода post проверяем корректную отправку тела запроса
 				if !strings.Contains(result, "bodvalue") {
 					t.Errorf("Не нашли в теле запроса bodvalue\n %+v", result)
@@ -177,16 +179,20 @@ func ExampleUniversalRequest_UniversalRequest() {
 		Origin string      `json:"origin"`
 		URL    string      `json:"url"`
 	}
-	ur := NewUniversalRequest(5, 0)
+
 	params := []map[string]string{{"param1": "1"}, {"param2": "2"}}
 	headers := []map[string]string{{"Myhead1": "1"}, {"Myhead2": "2"}}
 	bodMap := map[string]interface{}{"bodvalue": 1}
-	ur.Method = MethodPost
-	ur.URI = "https://httpbin.org/post"
-	ur.RespStatus = 200
-	ur.Body = bodMap
-	ur.Headers = headers
-	ur.Params = params
+	ur := UniversalRequest{
+		Client:     NewUsClient(5, 0),
+		Method:     http.MethodPost,
+		URI:        "https://httpbin.org/post",
+		RespStatus: 200,
+		Body:       bodMap,
+		Headers:    headers,
+		Params:     params,
+	}
+
 	result := HttpbinStruct{}
 	_, err := ur.UniversalRequest(&result)
 	if err != nil {

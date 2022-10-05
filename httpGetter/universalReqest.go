@@ -4,18 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-resty/resty/v2"
+	"net/http"
 	"time"
 )
 
 type Method string
 
-const (
-	MethodGet  Method = "GET"
-	MethodPost Method = "POST"
-)
-
 type UniversalRequest struct {
-	Client     resty.Client
+	Client     *resty.Client
 	Method     Method
 	URI        string
 	RespStatus int
@@ -62,12 +58,12 @@ func (ur UniversalRequest) UniversalRequest(resultStruct interface{}) (req resty
 
 	var resp *resty.Response
 	switch ur.Method {
-	case MethodPost:
+	case http.MethodPost:
 		resp, err = req.Post(ur.URI)
 		if err != nil {
 			return req, err
 		}
-	case MethodGet:
+	case http.MethodGet:
 		resp, err = req.Get(ur.URI)
 		if err != nil {
 			return req, err
@@ -102,7 +98,7 @@ func (ur UniversalRequest) checkStatus(resp *resty.Response) error {
 	return nil
 }
 
-func NewUniversalRequest(timeout time.Duration, retryCount int) UniversalRequest {
+func NewUsClient(timeout time.Duration, retryCount int) *resty.Client {
 	client := resty.New()
 	// Добавляем дефолтный таймаут
 	if timeout != 0 {
@@ -111,12 +107,5 @@ func NewUniversalRequest(timeout time.Duration, retryCount int) UniversalRequest
 
 	//Количество повторов запроса, в случае неудачи
 	client.SetRetryCount(retryCount)
-
-	return UniversalRequest{
-		Client:     *client,
-		URI:        "",
-		RespStatus: 0,
-		Body:       nil,
-		Headers:    nil,
-	}
+	return client
 }
