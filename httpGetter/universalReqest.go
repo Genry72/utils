@@ -15,7 +15,7 @@ const (
 )
 
 type UniversalRequest struct {
-	Client     *resty.Client
+	Client     resty.Client
 	Method     Method
 	URI        string
 	RespStatus int
@@ -113,7 +113,7 @@ func NewUniversalRequest(timeout time.Duration, retryCount int) UniversalRequest
 	client.SetRetryCount(retryCount)
 
 	return UniversalRequest{
-		Client:     client,
+		Client:     *client,
 		URI:        "",
 		RespStatus: 0,
 		Body:       nil,
