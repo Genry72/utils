@@ -8,98 +8,71 @@ import (
 	"time"
 )
 
-type Method string
+const (
+	ErrorWrongResultCode = "неожиданный код ответа"
+	ErrorMethodNotDefine = "метод определен не корректно"
+)
 
-type UniversalRequest struct {
-	Client     *resty.Client
-	Method     Method
+// RequestParams Параметры запроса
+type RequestParams struct {
+	Method     string
 	URI        string
 	RespStatus int
-	Body       interface{}
 	Headers    []map[string]string
 	Params     []map[string]string
+	Body       interface{}
 }
 
-// UniversalRequest выполняет любой запрос. Возвращает расперсенный ответ на основе переданной структуры.
-// Если вместо структуры передали string, то вернется тело ответа
-func (ur UniversalRequest) UniversalRequest(resultStruct interface{}) (req resty.Request, err error) {
+type UniversalRequest struct {
+	Client resty.Client
+}
 
-	if ur.URI == "" {
-		return req, fmt.Errorf("не задан URI")
+// todo fewfef
+func NewRequestParams(url string, method string, respStatus int, headers []map[string]string, params []map[string]string, body interface{}) *RequestParams {
+	return &RequestParams{
+		Method:     method,
+		URI:        url,
+		RespStatus: respStatus,
+		Headers:    headers,
+		Params:     params,
+		Body:       body,
 	}
+}
 
-	if ur.Method == "" {
-		return req, fmt.Errorf("не задан метод")
-	}
-
-	if ur.RespStatus == 0 {
-		return req, fmt.Errorf("не задан код ожидаемого ответа")
-	}
-
-	if resultStruct == nil {
-		return req, fmt.Errorf("не передана структура. Передайте поинтер на переменную с пустой строкой, если не нужно парсить тело ответа")
-	}
-
-	req = *ur.Client.R()
-
-	// Добавляем тело запроса
-	if ur.Body != nil {
-		req.SetBody(ur.Body)
-	}
-
-	// Добавляем заголовки
-	for _, v := range ur.Headers {
-		req.SetHeaders(v)
-	}
-	// Добавляем параметры запроса
-	for _, v := range ur.Params {
-		req.SetQueryParams(v)
-	}
-
-	var resp *resty.Response
-	switch ur.Method {
-	case http.MethodPost:
-		resp, err = req.Post(ur.URI)
-		if err != nil {
-			return req, err
-		}
-	case http.MethodGet:
-		resp, err = req.Get(ur.URI)
-		if err != nil {
-			return req, err
-		}
-	default:
-		return req, fmt.Errorf("указан некорректный метод %v", ur.Method)
-	}
-
-	err = ur.checkStatus(resp)
+// GetRresponse выполняет любой запрос. Возвращает распарсенный ответ на основе переданной структуры.
+// Если парсить не нужно, передайте nil
+func (ur UniversalRequest) GetRresponse(params *RequestParams, resultStruct interface{}) (body string, resp *resty.Response, err error) {
+	// Подготавливаем запрос
+	req, err := prepare(ur, params)
 	if err != nil {
-		return req, err
+		return "", nil, err
 	}
-	switch resultStruct.(type) {
-	case *string: // Возвращаем тело ответа без парсинга
-		*resultStruct.(*string) = string(resp.Body())
-		return req, err
+	// Выполняем
+	switch params.Method {
+	case http.MethodGet:
+		resp, err = req.Get(params.URI)
+	case http.MethodPost:
+		resp, err = req.Post(params.URI)
 	default:
-		err = json.Unmarshal(resp.Body(), resultStruct)
-
-		if err != nil {
-			return req, fmt.Errorf("не удалось распарсить тело ответа: %w %s", err, string(resp.Body()))
-		}
-		return req, nil
-	}
-}
-
-func (ur UniversalRequest) checkStatus(resp *resty.Response) error {
-	if resp.StatusCode() != ur.RespStatus {
-		return fmt.Errorf("%s %s", resp.Status(), string(resp.Body()))
+		return "", resp, fmt.Errorf(ErrorMethodNotDefine)
 	}
 
-	return nil
+	if err != nil {
+		return "", resp, err
+	}
+
+	body = string(resp.Body())
+
+	// Обрабатываем
+	err = getResult(resp, resultStruct, params.RespStatus)
+	if err != nil {
+		return body, resp, err
+	}
+	return body, resp, nil
 }
 
-func NewUsClient(timeout time.Duration, retryCount int) *resty.Client {
-	client := resty.New()
+func NewUsClient(timeout time.Duration, retryCount int) resty.Client {
+	client := *resty.New()
 	// Добавляем дефолтный таймаут
 	if timeout != 0 {
 		client.SetTimeout(timeout * time.Second)
@@ -108,4 +81,50 @@ func NewUsClient(timeout time.Duration, retryCount int) *resty.Client {
 	//Количество повторов запроса, в случае неудачи
 	client.SetRetryCount(retryCount)
 	return client
+}
+
+// Добавляем боди, заголовки и тд
+func prepare(ur UniversalRequest, params *RequestParams) (*resty.Request, error) {
+	if params.URI == "" {
+		return nil, fmt.Errorf("не задан URI")
+	}
+
+	if params.RespStatus == 0 {
+		return nil, fmt.Errorf("не задан код ожидаемого ответа")
+	}
+
+	req := ur.Client.R()
+
+	// Добавляем тело запроса
+	if params.Body != nil {
+		req.SetBody(params.Body)
+	}
+
+	// Добавляем заголовки
+	for _, v := range params.Headers {
+		req.SetHeaders(v)
+	}
+	// Добавляем параметры запроса
+	for _, v := range params.Params {
+		req.SetQueryParams(v)
+	}
+	return req, nil
+}
+
+// Обрабатываем результат ответа: получаем боди, и парсим, если нужно
+func getResult(resp *resty.Response, resultStruct interface{}, wantCode int) error {
+
+	if resp.StatusCode() != wantCode {
+		return fmt.Errorf(ErrorWrongResultCode)
+	}
+
+	if resultStruct == nil {
+		return nil
+	}
+
+	err := json.Unmarshal(resp.Body(), resultStruct)
+	if err != nil {
+		return fmt.Errorf("не удалось распарсить тело ответа: %w %s", err, string(resp.Body()))
+	}
+	return nil
 }

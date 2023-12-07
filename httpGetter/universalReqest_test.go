@@ -25,139 +25,96 @@ type HttpbinStruct struct {
 
 func TestUniversalRequest_UniversalRequest(t *testing.T) {
 	t.Parallel()
-	type fields struct {
-		Method
-		URI     string
-		Body    interface{}
-		Headers []map[string]string
-		Params  []map[string]string
-	}
-
 	type args struct {
+		Method       string
 		resultStruct interface{}
+		RespStatus   int
+		URI          string
+		Body         interface{}
 	}
 	ur := UniversalRequest{
-		Client:     NewUsClient(5, 0),
-		RespStatus: 200,
+		Client: NewUsClient(5, 0),
 	}
 
 	// Параметры запроса
 	params := []map[string]string{{"param1": "1"}, {"param2": "2"}}
 	headers := []map[string]string{{"Myhead1": "1"}, {"Myhead2": "2"}}
 	bodMap := map[string]interface{}{"bodvalue": 1}
+	resulStruct := HttpbinStruct{}
 	tests := []struct {
-		name          string
-		args          args
-		fields        fields
-		wantReqDetail string
-		respContain   string // Проверка существования в ответе текста
-		wantErr       bool
+		name string
+		args
+		wantErr bool
 	}{
 		//Post
 		{
 			name: "Без структуры",
 			args: args{
-				resultStruct: "",
+				Method:       http.MethodPost,
+				resultStruct: nil,
+				RespStatus:   200,
+				URI:          "https://httpbin.org/post",
+				Body:         "bodvalue",
 			},
-			fields: fields{
-				Method:  http.MethodPost,
-				URI:     "https://httpbin.org/post",
-				Body:    "bodvalue",
-				Headers: headers,
-				Params:  params,
-			},
-			wantReqDetail: "Method:", // ищем слово в информации о запросе
-			respContain:   "args",
-			wantErr:       false,
+			wantErr: false,
 		},
 		{
 			name: "Со структурой",
 			args: args{
-				resultStruct: HttpbinStruct{},
+				Method:       http.MethodPost,
+				resultStruct: &resulStruct,
+				RespStatus:   200,
+				URI:          "https://httpbin.org/post",
+				Body:         bodMap,
 			},
-			fields: fields{
-				Method:  http.MethodPost,
-				URI:     "https://httpbin.org/post",
-				Body:    bodMap,
-				Headers: headers,
-				Params:  params,
-			},
-			wantReqDetail: "Method:", // ищем слово в информации о запросе
-			respContain:   "args",
-			wantErr:       false,
+			wantErr: false,
 		},
 		//Get
 		{
 			name: "Get Со структурой",
 			args: args{
-				resultStruct: HttpbinStruct{},
+				Method:       http.MethodGet,
+				resultStruct: &resulStruct,
+				RespStatus:   200,
+				URI:          "https://httpbin.org/get",
+				Body:         nil,
 			},
-			fields: fields{
-				Method:  http.MethodGet,
-				URI:     "https://httpbin.org/get",
-				Body:    nil,
-				Headers: headers,
-				Params:  params,
-			},
-			wantReqDetail: "Method:", // ищем слово в информации о запросе
-			respContain:   "args",
-			wantErr:       false,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ur.Method = tt.fields.Method
-			ur.URI = tt.fields.URI
-			ur.Body = tt.fields.Body
-			ur.Headers = tt.fields.Headers
-			ur.Params = tt.fields.Params
+			params := NewRequestParams(tt.args.URI, tt.args.Method, tt.args.RespStatus, headers, params, tt.args.Body)
 
-			result := fmt.Sprintf("%+v", tt.args.resultStruct)
-			reqDetail, err := ur.UniversalRequest(&result)
+			body, resp, err := ur.GetRresponse(params, tt.args.resultStruct)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Вернулась ошибка = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Вернулась ошибка = %v, wantErr %v, %+v body:%s url: %s", err, tt.wantErr, tt.args, body, resp.Request.Method)
 				return
 			}
+			bodyontains := "ttps://httpbin.org" // ищем в боди
+			if !strings.Contains(body, bodyontains) {
+				t.Errorf("Неожиданное тело ответа. Не нашли в боди %v. Боди:%v", bodyontains, body)
+			}
 
-			switch tt.args.resultStruct.(type) {
-			case string: // Передача cтроки
-				result := tt.args.resultStruct.(string)
-				reqDetail, err = ur.UniversalRequest(&result)
+			if !strings.Contains(resp.Request.URL, "https://httpbin.org") {
+				t.Errorf("Не нашли в стуктуре URL https://httpbin.org/post. Полученная структура %+v", resp.Request)
+			}
 
-				if !strings.Contains(result, tt.respContain) {
-					t.Errorf("Неожиданное тело ответа. Не нашли в боди %v. Боди:%v", tt.respContain, result)
+			if tt.args.resultStruct != nil {
+				if tt.args.resultStruct.(*HttpbinStruct).Args["param1"] != "1" {
+					t.Errorf("Не нашли параметр param1 в запросе\n %+v", tt.args.resultStruct.(HttpbinStruct))
 				}
-
-			case HttpbinStruct: // Передача структуры
-				result := tt.args.resultStruct.(HttpbinStruct)
-				reqDetail, err = ur.UniversalRequest(&result)
-
-				if !strings.Contains(result.URL, "https://httpbin.org") {
-					t.Errorf("Не нашли в стуктуре URL https://httpbin.org/post. Полученная структура %+v", result)
-				}
-				if result.Args["param1"] != "1" {
-					t.Errorf("Не нашли параметр param1 в запросе\n %+v", result)
-				}
-
-				if result.Headers["Myhead1"] != "1" {
-					t.Errorf("Не нашли хедер Myhead1 в запросе\n %+v", result)
+				if tt.args.resultStruct.(*HttpbinStruct).Headers["Myhead1"] != "1" {
+					t.Errorf("Не нашли хедер Myhead1 в запросе\n %+v", tt.args.resultStruct.(HttpbinStruct))
 				}
 			}
 
-			switch tt.fields.Method {
-			case http.MethodPost:
+			// todo добавить проверку reqdetail, хеедер, параметры
+			if tt.args.Method == http.MethodPost {
 				//Для метода post проверяем корректную отправку тела запроса
-				if !strings.Contains(result, "bodvalue") {
-					t.Errorf("Не нашли в теле запроса bodvalue\n %+v", result)
+				if !strings.Contains(body, "bodvalue") {
+					t.Errorf("Не нашли в теле запроса bodvalue\n %+v", body)
 				}
-			}
-
-			if !strings.Contains(fmt.Sprintf("%+v", reqDetail), tt.wantReqDetail) {
-				t.Errorf("В информации о заросе не нашли %v, вернулось %v", tt.wantReqDetail, reqDetail)
-			}
-
-			if !strings.Contains(fmt.Sprint(reqDetail.URL), "https://httpbin.org") {
-				t.Errorf("В информации о запросе не вернулся URL\n %+v", reqDetail)
 			}
 
 		})
@@ -180,25 +137,20 @@ func ExampleUniversalRequest_UniversalRequest() {
 		URL    string      `json:"url"`
 	}
 
-	params := []map[string]string{{"param1": "1"}, {"param2": "2"}}
+	params := []map[string]string{{"param1": "1"}, {"param2": "z"}}
 	headers := []map[string]string{{"Myhead1": "1"}, {"Myhead2": "2"}}
 	bodMap := map[string]interface{}{"bodvalue": 1}
 	ur := UniversalRequest{
-		Client:     NewUsClient(5, 0),
-		Method:     http.MethodPost,
-		URI:        "https://httpbin.org/post",
-		RespStatus: 200,
-		Body:       bodMap,
-		Headers:    headers,
-		Params:     params,
+		Client: NewUsClient(5, 0),
 	}
 
+	reqParams := NewRequestParams("https://httpbin.org/post", http.MethodPost, 200, headers, params, bodMap)
 	result := HttpbinStruct{}
-	_, err := ur.UniversalRequest(&result)
+	_, _, err := ur.GetRresponse(reqParams, &result)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	fmt.Println(result.URL)
-	// Output: https://httpbin.org/post?param1=1&param2=2
+	// Output: https://httpbin.org/post?param1=1&param2=z
 }
