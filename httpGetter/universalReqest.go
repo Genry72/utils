@@ -38,6 +38,7 @@ func NewRequestParams(url string, method string, respStatus int, headers []map[s
 	}
 }
 
+// add hz
 // GetRresponse выполняет любой запрос. Возвращает распарсенный ответ на основе переданной структуры.
 // Если парсить не нужно, передайте nil
 func (ur UniversalRequest) GetRresponse(params *RequestParams, resultStruct interface{}) (body string, resp *resty.Response, err error) {
