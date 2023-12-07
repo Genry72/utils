@@ -27,10 +27,6 @@ type UniversalRequest struct {
 	Client resty.Client
 }
 
-func new() {
-	fmt.Println("dsdadsa")
-}
-
 func new2() {
 	fmt.Println("dsda")
 }
