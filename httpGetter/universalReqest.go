@@ -27,7 +27,7 @@ type UniversalRequest struct {
 	Client resty.Client
 }
 
-// todo fe
+// todo fegg
 func NewRequestParams(url string, method string, respStatus int, headers []map[string]string, params []map[string]string, body interface{}) *RequestParams {
 	return &RequestParams{
 		Method:     method,
