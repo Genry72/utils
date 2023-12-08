@@ -27,11 +27,7 @@ type UniversalRequest struct {
 	Client resty.Client
 }
 
-func new() {
-	fmt.Println("dsewqee")
-}
-
-///1
+//1
 
 func NewRequestParams(url string, method string, respStatus int, headers []map[string]string, params []map[string]string, body interface{}) *RequestParams {
 	return &RequestParams{
